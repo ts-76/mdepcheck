@@ -39,13 +39,13 @@ You can install it globally or use it via `npx` (once published) or run from sou
 Run the tool against your project root:
 
 ```bash
-mdepcheck /path/to/your/project
+npx mdepcheck /path/to/your/project
 ```
 
 If you linked it globally:
 
 ```bash
-mdepcheck .
+npx mdepcheck .
 ```
 
 ### Output Example
