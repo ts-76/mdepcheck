@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.1.3
+
+[compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.2...v0.1.3)
+
+### 🩹 Fixes
+
+- Package.json ([f63dac2](https://github.com/ts-76/mdepcheck/commit/f63dac2))
+
+### ❤️ Contributors
+
+- Ts-76 <ts.createlink@gmail.com>
+
 ## v0.1.2
 
 [compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.1...v0.1.2)
