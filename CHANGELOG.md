@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.1.5
+
+[compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.4...v0.1.5)
+
+### 📖 Documentation
+
+- Update README to include new dependency checks and usage examples ([6f6624d](https://github.com/ts-76/mdepcheck/commit/6f6624d))
+
+### ❤️ Contributors
+
+- Ts-76 <ts.createlink@gmail.com>
+
 ## v0.1.4
 
 [compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.3...v0.1.4)
