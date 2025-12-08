@@ -9,7 +9,7 @@ export interface DepcheckConfig {
 
 export class ConfigLoader {
     async load(rootDir: string): Promise<DepcheckConfig> {
-        const explorer = lilconfig('mdepcheck', {
+        const explorer = lilconfig('monodep', {
             stopDir: rootDir,
         });
 

@@ -1,6 +1,40 @@
-# mdepcheck
+# monodep
 
 A dependency check tool designed for monorepos. It analyzes your project to find unused, missing, misplaced, and outdated dependencies, supporting nested packages and various package managers.
+
+## Why monodep?
+
+There are many excellent tools for managing JavaScript dependencies. Here's how monodep compares:
+
+| Feature | Knip | depcheck | syncpack | Dependabot | dependency-cruiser | monodep |
+|---------|------|----------|----------|------------|--------------------|---------|
+
+| Unused dependencies | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Missing dependencies | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Wrong dependency type (dev vs prod) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Version mismatch across packages | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| Outdated dependencies | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ |
+| Internal package validation (workspace:*) | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| Peer dependency validation | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Circular dependencies | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Unused exports/files | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Auto-fix | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Monorepo support | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Plugin ecosystem | ✅ (70+) | ✅ | ❌ | ❌ | ✅ | ❌ |
+
+### monodep-Specific Features
+
+- **Wrong dependency type detection**: Identifies when a production dependency should be in devDependencies (e.g., test utilities in dependencies) or vice versa.
+- **Version mismatch detection**: Finds when the same package has different versions across your monorepo packages.
+- **Internal package validation**: Ensures internal workspace packages use `workspace:*` protocol and are properly referenced.
+- **Peer dependency validation**: Validates that peer dependencies are properly provided by host packages.
+
+### Recommended Usage
+
+- Use **Knip** for dead code detection (unused exports, files, dependencies)
+- Use **dependency-cruiser** for circular dependency detection
+- Use **monodep** with `--only-extras` for wrongType, mismatch, outdated, internal, and peer checks
+- Or use **monodep** standalone for complete dependency analysis
 
 ## Features
 
@@ -12,6 +46,8 @@ A dependency check tool designed for monorepos. It analyzes your project to find
   - **Wrong dependency types**: Dependencies that should be in `devDependencies` but are in `dependencies` (or vice versa).
   - **Outdated dependencies**: Packages with newer versions available on npm.
   - **Version mismatches**: Same dependency with different versions across packages in the monorepo.
+  - **Internal package issues**: Internal packages not using `workspace:*` protocol or unlisted internal imports.
+  - **Peer dependency issues**: Missing or incompatible peer dependencies in consuming packages.
 - **Package Manager Agnostic**: Works with npm, yarn, pnpm, and bun.
 - **TypeScript Support**: Parses TypeScript files to extract imports.
 - **Configurable**: Supports configuration files to customize behavior.
@@ -20,13 +56,13 @@ A dependency check tool designed for monorepos. It analyzes your project to find
 ## Installation
 
 ```bash
-npm install -g @ts-76/mdepcheck
+npm install -g monodep
 ```
 
 Or use directly via npx:
 
 ```bash
-npx @ts-76/mdepcheck
+npx monodep
 ```
 
 ### From Source
@@ -52,13 +88,13 @@ npx @ts-76/mdepcheck
 Run the tool against your project root:
 
 ```bash
-npx @ts-76/mdepcheck /path/to/your/project
+npx monodep /path/to/your/project
 ```
 
 Or in the current directory:
 
 ```bash
-npx @ts-76/mdepcheck .
+npx monodep .
 ```
 
 ### Options
@@ -66,11 +102,12 @@ npx @ts-76/mdepcheck .
 | Option | Description |
 |--------|-------------|
 | `--compact` | Output compact log format for AI agents and CI pipelines |
+| `--only-extras` | Only run checks not covered by Knip (wrongType, mismatch, outdated, internal, peer) |
 
 ### Output Example
 
 ```text
-📦 mdepcheck - Monorepo Dependency Checker
+📦 monodep - Monorepo Dependency Checker
 
 Analyzing project at /path/to/project...
 Found 3 packages.
@@ -85,6 +122,10 @@ Found 3 packages.
      - chalk: Should be in devDependencies (found in dependencies)
    ⏰ Outdated dependencies:
      - typescript: ^5.0.0 → 5.3.3
+   🔗 Internal package issues:
+     - @myorg/utils: Should use workspace:* protocol
+   👥 Peer dependency issues:
+     - react: Missing peer dependency (required by @myorg/ui)
 
 📁 package-b
    /path/to/project/packages/b
@@ -107,10 +148,12 @@ Found 3 packages.
    ⚡ Wrong type:  1
    ⏰ Outdated:    1
    🔀 Mismatches:  1
+   🔗 Internal:    1
+   👥 Peer:        1
 
 ──────────────────────────────────────────────────
 
-❌ Total issues: 5
+❌ Total issues: 7
 ```
 
 ### Compact Output
@@ -118,31 +161,52 @@ Found 3 packages.
 For CI pipelines or AI agents, use the `--compact` flag:
 
 ```bash
-npx @ts-76/mdepcheck . --compact
+npx monodep . --compact
 ```
 
 Output:
 ```text
-[mdepcheck] scanned=3 issues=5
+[monodep] scanned=3 issues=7
 [unused] package-a: lodash
 [missing] package-a: react
 [wrongType] package-a: chalk (dependencies -> devDependencies)
 [outdated] package-a: typescript (^5.0.0 -> 5.3.3)
 [mismatch] *: lodash (^4.17.21(package-a,package-c) vs ^4.17.20(package-b))
+[internal] package-a: @myorg/utils (should use workspace:*)
+[peer] package-a: react (missing, required by @myorg/ui)
 ```
+
+## Knip Integration Mode
+
+If you're already using [Knip](https://knip.dev/) for unused dependency detection, you can run monodep in `--only-extras` mode to avoid duplicate checks:
+
+```bash
+# Run only monodep-specific checks
+npx monodep . --only-extras
+
+# Combine with compact output for CI
+npx monodep . --only-extras --compact
+```
+
+This mode skips unused/missing dependency detection (which Knip handles) and focuses on:
+- **wrongType**: Dependencies in wrong section (devDependencies vs dependencies)
+- **mismatch**: Version inconsistencies across packages
+- **outdated**: Packages with newer versions available
+- **internal**: Internal workspace package reference issues
+- **peer**: Peer dependency validation issues
 
 ## Configuration
 
 Create a configuration file in your project root. Supported formats:
 
-- `.mdepcheckrc`
-- `.mdepcheckrc.json`
-- `.mdepcheckrc.yaml`
-- `.mdepcheckrc.yml`
-- `.mdepcheckrc.js`
-- `.mdepcheckrc.cjs`
-- `mdepcheck.config.js`
-- `mdepcheck.config.cjs`
+- `.monodeprc`
+- `.monodeprc.json`
+- `.monodeprc.yaml`
+- `.monodeprc.yml`
+- `.monodeprc.js`
+- `.monodeprc.cjs`
+- `monodep.config.js`
+- `monodep.config.cjs`
 
 ### Configuration Options
 

@@ -7,6 +7,8 @@ import { Analyzer } from './analyzer';
 import { VersionChecker } from './version-checker';
 import { ConfigLoader } from './config';
 import { ConsistencyChecker } from './consistency';
+import { InternalChecker } from './internal-checker';
+import { PeerChecker } from './peer-checker';
 
 interface Stats {
     packagesScanned: number;
@@ -16,11 +18,13 @@ interface Stats {
     wrongTypeCount: number;
     outdatedCount: number;
     mismatchCount: number;
+    internalCount: number;
+    peerCount: number;
 }
 
 interface CompactIssue {
     package: string;
-    type: 'unused' | 'missing' | 'wrongType' | 'outdated' | 'mismatch';
+    type: 'unused' | 'missing' | 'wrongType' | 'outdated' | 'mismatch' | 'internal' | 'peer';
     dependency: string;
     detail?: string;
 }
@@ -28,18 +32,25 @@ interface CompactIssue {
 const program = new Command();
 
 program
-    .name('mdepcheck')
+    .name('monodep')
     .description('A dependency check tool for monorepos')
     .version('1.0.0')
     .argument('[directory]', 'Root directory of the project', '.')
     .option('--compact', 'Output compact log for AI agents')
+    .option('--only-extras', 'Only run checks not covered by Knip (wrongType, mismatch, outdated, internal, peer)')
     .action(async (directory, options) => {
         const rootDir = path.resolve(directory);
         const compact = options.compact;
+        const onlyExtras = options.onlyExtras;
 
         if (!compact) {
-            console.log(chalk.bold.blue('\n📦 mdepcheck - Monorepo Dependency Checker\n'));
+            const modeLabel = onlyExtras ? ' (extras only)' : '';
+            console.log(chalk.bold.blue(`\n📦 monodep - Monorepo Dependency Checker${modeLabel}\n`));
             console.log(chalk.gray(`Analyzing project at ${rootDir}...`));
+            if (onlyExtras) {
+                console.log(chalk.gray('Running only monodep-specific checks (wrongType, mismatch, outdated)'));
+                console.log(chalk.gray('Use full mode for unused/missing dependency detection, or use Knip.\n'));
+            }
         }
 
         const configLoader = new ConfigLoader();
@@ -63,6 +74,8 @@ program
             wrongTypeCount: 0,
             outdatedCount: 0,
             mismatchCount: 0,
+            internalCount: 0,
+            peerCount: 0,
         };
 
         const compactIssues: CompactIssue[] = [];
@@ -102,34 +115,37 @@ program
 
             let packageHasIssues = false;
 
-            if (result.unused.length > 0) {
-                if (!compact) {
-                    console.log(chalk.yellow('   ⚠ Unused dependencies:'));
-                    result.unused.forEach((dep) => console.log(chalk.yellow(`     - ${dep}`)));
-                } else {
-                    result.unused.forEach((dep) => compactIssues.push({
-                        package: pkg.name,
-                        type: 'unused',
-                        dependency: dep,
-                    }));
+            // Skip unused/missing checks in --only-extras mode (Knip handles these)
+            if (!onlyExtras) {
+                if (result.unused.length > 0) {
+                    if (!compact) {
+                        console.log(chalk.yellow('   ⚠ Unused dependencies:'));
+                        result.unused.forEach((dep) => console.log(chalk.yellow(`     - ${dep}`)));
+                    } else {
+                        result.unused.forEach((dep) => compactIssues.push({
+                            package: pkg.name,
+                            type: 'unused',
+                            dependency: dep,
+                        }));
+                    }
+                    stats.unusedCount += result.unused.length;
+                    packageHasIssues = true;
                 }
-                stats.unusedCount += result.unused.length;
-                packageHasIssues = true;
-            }
 
-            if (result.missing.length > 0) {
-                if (!compact) {
-                    console.log(chalk.red('   ✗ Missing dependencies:'));
-                    result.missing.forEach((dep) => console.log(chalk.red(`     - ${dep}`)));
-                } else {
-                    result.missing.forEach((dep) => compactIssues.push({
-                        package: pkg.name,
-                        type: 'missing',
-                        dependency: dep,
-                    }));
+                if (result.missing.length > 0) {
+                    if (!compact) {
+                        console.log(chalk.red('   ✗ Missing dependencies:'));
+                        result.missing.forEach((dep) => console.log(chalk.red(`     - ${dep}`)));
+                    } else {
+                        result.missing.forEach((dep) => compactIssues.push({
+                            package: pkg.name,
+                            type: 'missing',
+                            dependency: dep,
+                        }));
+                    }
+                    stats.missingCount += result.missing.length;
+                    packageHasIssues = true;
                 }
-                stats.missingCount += result.missing.length;
-                packageHasIssues = true;
             }
 
             if (result.wrongType.length > 0) {
@@ -220,11 +236,66 @@ program
             stats.mismatchCount = mismatches.length;
         }
 
-        const totalIssues = stats.unusedCount + stats.missingCount + stats.wrongTypeCount + stats.outdatedCount + stats.mismatchCount;
+        // Check for internal package reference issues
+        const internalChecker = new InternalChecker();
+        // Build a map of used imports per package (we need to collect this during analysis)
+        const usedImports = new Map<string, Set<string>>();
+        // For now, we can only check workspace: protocol usage, not actual imports
+        // The import tracking would require modifying the analyzer
+        const internalIssues = internalChecker.check(packages, usedImports);
+
+        if (internalIssues.length > 0) {
+            if (!compact) {
+                console.log(chalk.bold.yellow('📦 Internal Package Issues Found:'));
+                for (const issue of internalIssues) {
+                    console.log(chalk.yellow(`   ${issue.packageName}: ${issue.dependency}`));
+                    console.log(chalk.yellow(`     - ${issue.detail}`));
+                }
+                console.log('');
+            } else {
+                for (const issue of internalIssues) {
+                    compactIssues.push({
+                        package: issue.packageName,
+                        type: 'internal',
+                        dependency: issue.dependency,
+                        detail: issue.detail,
+                    });
+                }
+            }
+            stats.internalCount = internalIssues.length;
+        }
+
+        // Check for peer dependency issues
+        const peerChecker = new PeerChecker();
+        const rootPkg = packages.find(p => p.location === rootDir);
+        const peerIssues = peerChecker.check(packages, rootPkg);
+
+        if (peerIssues.length > 0) {
+            if (!compact) {
+                console.log(chalk.bold.cyan('🔗 Peer Dependency Issues Found:'));
+                for (const issue of peerIssues) {
+                    console.log(chalk.cyan(`   ${issue.packageName}: ${issue.peerDep}`));
+                    console.log(chalk.cyan(`     - ${issue.detail}`));
+                }
+                console.log('');
+            } else {
+                for (const issue of peerIssues) {
+                    compactIssues.push({
+                        package: issue.packageName,
+                        type: 'peer',
+                        dependency: issue.peerDep,
+                        detail: issue.detail,
+                    });
+                }
+            }
+            stats.peerCount = peerIssues.length;
+        }
+
+        const totalIssues = stats.unusedCount + stats.missingCount + stats.wrongTypeCount + stats.outdatedCount + stats.mismatchCount + stats.internalCount + stats.peerCount;
 
         if (compact) {
             // Compact output for AI agents
-            console.log(`[mdepcheck] scanned=${stats.packagesScanned} issues=${totalIssues}`);
+            console.log(`[monodep] scanned=${stats.packagesScanned} issues=${totalIssues}`);
             for (const issue of compactIssues) {
                 const detail = issue.detail ? ` (${issue.detail})` : '';
                 console.log(`[${issue.type}] ${issue.package}: ${issue.dependency}${detail}`);
@@ -238,11 +309,13 @@ program
             console.log(`   Packages with issues: ${stats.packagesWithIssues > 0 ? chalk.bold.red(stats.packagesWithIssues) : chalk.bold.green(stats.packagesWithIssues)}`);
             console.log('');
 
-            if (stats.unusedCount > 0) {
-                console.log(chalk.yellow(`   ⚠ Unused:      ${stats.unusedCount}`));
-            }
-            if (stats.missingCount > 0) {
-                console.log(chalk.red(`   ✗ Missing:     ${stats.missingCount}`));
+            if (!onlyExtras) {
+                if (stats.unusedCount > 0) {
+                    console.log(chalk.yellow(`   ⚠ Unused:      ${stats.unusedCount}`));
+                }
+                if (stats.missingCount > 0) {
+                    console.log(chalk.red(`   ✗ Missing:     ${stats.missingCount}`));
+                }
             }
             if (stats.wrongTypeCount > 0) {
                 console.log(chalk.magenta(`   ⚡ Wrong type:  ${stats.wrongTypeCount}`));
@@ -252,6 +325,12 @@ program
             }
             if (stats.mismatchCount > 0) {
                 console.log(chalk.red(`   🔀 Mismatches:  ${stats.mismatchCount}`));
+            }
+            if (stats.internalCount > 0) {
+                console.log(chalk.yellow(`   📦 Internal:    ${stats.internalCount}`));
+            }
+            if (stats.peerCount > 0) {
+                console.log(chalk.cyan(`   🔗 Peer:        ${stats.peerCount}`));
             }
 
             if (totalIssues === 0) {
