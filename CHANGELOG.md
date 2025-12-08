@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.1.7
+
+[compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.6...v0.1.7)
+
+### 🚀 Enhancements
+
+- Add --no-outdated option to skip outdated dependency checks and improve version fetching performance ([51a8a28](https://github.com/ts-76/mdepcheck/commit/51a8a28))
+
+### ❤️ Contributors
+
+- Ts-76 <ts.createlink@gmail.com>
+
 ## v0.1.6
 
 [compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.5...v0.1.6)
