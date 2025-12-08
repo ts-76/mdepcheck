@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.1.6
+
+[compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.5...v0.1.6)
+
+### 🚀 Enhancements
+
+- Rename package to monodep and add internal/peer dependency checks ([1cf83d9](https://github.com/ts-76/mdepcheck/commit/1cf83d9))
+
+### 🏡 Chore
+
+- **release:** V0.1.5 ([da15b99](https://github.com/ts-76/mdepcheck/commit/da15b99))
+
+### ❤️ Contributors
+
+- Ts-76 <ts.createlink@gmail.com>
+
 ## v0.1.5
 
 [compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.4...v0.1.5)
