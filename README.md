@@ -103,6 +103,7 @@ npx monodep .
 |--------|-------------|
 | `--compact` | Output compact log format for AI agents and CI pipelines |
 | `--only-extras` | Only run checks not covered by Knip (wrongType, mismatch, outdated, internal, peer) |
+| `--no-outdated` | Skip outdated dependency checks for faster execution |
 
 ### Output Example
 
@@ -233,8 +234,25 @@ Create a configuration file in your project root. Supported formats:
 3. **Import Parsing**: It parses the source files using TypeScript's parser to find all import statements.
 4. **Dependency Comparison**: It compares the found imports against the `dependencies`, `devDependencies`, and `peerDependencies` listed in the package's `package.json`.
 5. **Type Classification**: It detects whether imports are used in production code or test files to identify wrong dependency types.
-6. **Version Checking**: It queries the npm registry to find the latest versions of dependencies.
+6. **Version Checking**: It queries the npm registry to find the latest versions of dependencies. Optimized with deduplication, caching, and parallel requests (max 10 concurrent) to minimize registry load.
 7. **Consistency Check**: It compares dependency versions across all packages to find mismatches.
+
+## Performance
+
+The outdated dependency check requires network requests to the npm registry. To optimize performance:
+
+- **Deduplication**: Same packages across multiple workspaces are only checked once
+- **Parallel requests**: Up to 10 concurrent requests with rate limiting
+- **Caching**: Version information is cached during execution
+- **Skip option**: Use `--no-outdated` to skip version checks entirely for fastest execution
+
+```bash
+# Fast mode (skip outdated checks)
+npx monodep . --no-outdated
+
+# Full check with outdated detection
+npx monodep .
+```
 
 ## Exit Codes
 

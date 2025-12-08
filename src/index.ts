@@ -38,10 +38,12 @@ program
     .argument('[directory]', 'Root directory of the project', '.')
     .option('--compact', 'Output compact log for AI agents')
     .option('--only-extras', 'Only run checks not covered by Knip (wrongType, mismatch, outdated, internal, peer)')
+    .option('--no-outdated', 'Skip outdated dependency checks (faster execution)')
     .action(async (directory, options) => {
         const rootDir = path.resolve(directory);
         const compact = options.compact;
         const onlyExtras = options.onlyExtras;
+        const skipOutdated = options.outdated === false;
 
         if (!compact) {
             const modeLabel = onlyExtras ? ' (extras only)' : '';
@@ -81,7 +83,28 @@ program
         const compactIssues: CompactIssue[] = [];
 
         // By default, all checks are enabled. Config can disable them.
-        const checkOutdated = config.checkOutdated !== false;
+        // --no-outdated flag or config.checkOutdated=false will disable outdated checks
+        const checkOutdated = !skipOutdated && config.checkOutdated !== false;
+
+        // Pre-fetch all package versions at once for better performance
+        if (checkOutdated) {
+            const allDependencies = new Set<string>();
+            for (const pkg of packages) {
+                if (config.skipPackages && config.skipPackages.includes(pkg.name)) {
+                    continue;
+                }
+                const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+                for (const [depName, depVersion] of Object.entries(deps)) {
+                    if (!depVersion.startsWith('workspace:') && !depVersion.startsWith('file:')) {
+                        allDependencies.add(depName);
+                    }
+                }
+            }
+            if (allDependencies.size > 0 && !compact) {
+                console.log(chalk.gray(`Checking ${allDependencies.size} unique dependencies for updates...\n`));
+            }
+            await versionChecker.prefetch([...allDependencies]);
+        }
 
         for (const pkg of packages) {
             if (config.skipPackages && config.skipPackages.includes(pkg.name)) {
