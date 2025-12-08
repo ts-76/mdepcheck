@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.1.8
+
+[compare changes](https://github.com/ts-76/monodep/compare/v0.1.7...v0.1.8)
+
+### 🩹 Fixes
+
+- Update repository URL in package.json to reflect correct GitHub link ([32b6237](https://github.com/ts-76/monodep/commit/32b6237))
+
+### 🏡 Chore
+
+- **release:** V0.1.7 ([9a39e25](https://github.com/ts-76/monodep/commit/9a39e25))
+
+### ❤️ Contributors
+
+- Tsukuruhito <ts.createlink@gmail.com>
+- Ts-76 <ts.createlink@gmail.com>
+
 ## v0.1.7
 
 [compare changes](https://github.com/ts-76/mdepcheck/compare/v0.1.6...v0.1.7)
